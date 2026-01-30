@@ -1,0 +1,707 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ season.name }} | AnimeFlix Ultimate{% endblock %}
+
+{% block content %}
+
+<style>
+    /* =========================================
+       1. CSS VARIABLES & THEME CONFIGURATION
+       ========================================= */
+    :root {
+        /* Core Brand Colors */
+        --color-brand-primary: #7d2ae8;
+        --color-brand-secondary: #ff007a;
+        --color-brand-accent: #00f2ff;
+        
+        /* Dark Mode Backgrounds */
+        --bg-body: #050505;
+        --bg-surface-1: #0a0a0a;
+        --bg-surface-2: #121212;
+        --bg-surface-3: #1c1c1c;
+
+        /* Text Colors */
+        --text-primary: #ffffff;
+        --text-secondary: #b3b3b3;
+        --text-tertiary: #666666;
+        --text-disabled: #404040;
+
+        /* Glassmorphism Settings */
+        --glass-bg: rgba(20, 20, 20, 0.65);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --glass-highlight: rgba(255, 255, 255, 0.15);
+        --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        --blur-strength: 16px;
+
+        /* Spacing System */
+        --space-xs: 4px;
+        --space-sm: 8px;
+        --space-md: 16px;
+        --space-lg: 24px;
+        --space-xl: 32px;
+        --space-xxl: 64px;
+        --space-jumbo: 128px;
+
+        /* Animation Timings */
+        --ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
+        --ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
+        --anim-fast: 0.2s;
+        --anim-med: 0.4s;
+        --anim-slow: 0.8s;
+
+        /* Z-Index Layers */
+        --z-back: -1;
+        --z-normal: 1;
+        --z-tooltip: 10;
+        --z-fixed: 100;
+        --z-modal: 1000;
+    }
+
+    /* =========================================
+       2. MODERN CSS RESET & NORMALIZATION
+       ========================================= */
+    *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    html {
+        scroll-behavior: smooth;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-body);
+        color: var(--text-primary);
+        line-height: 1.6;
+        overflow-x: hidden; /* Critical for full width design */
+        width: 100%;
+        min-height: 100vh;
+    }
+
+    /* Hiding Scrollbar while keeping functionality */
+    body::-webkit-scrollbar {
+        width: 0px;
+        background: transparent; 
+    }
+    body {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+
+    a { text-decoration: none; color: inherit; transition: var(--anim-fast); }
+    ul { list-style: none; }
+    img { max-width: 100%; display: block; }
+    button { border: none; background: none; cursor: pointer; font-family: inherit; }
+
+    /* =========================================
+       3. UTILITY CLASSES & ANIMATIONS
+       ========================================= */
+    
+    /* Fade In Up Keyframes */
+    @keyframes fadeInUp {
+        0% { opacity: 0; transform: translate3d(0, 40px, 0); }
+        100% { opacity: 1; transform: translate3d(0, 0, 0); }
+    }
+
+    /* Pulse Glow Keyframes */
+    @keyframes pulseGlow {
+        0% { box-shadow: 0 0 0 0 rgba(125, 42, 232, 0.4); }
+        70% { box-shadow: 0 0 0 15px rgba(125, 42, 232, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(125, 42, 232, 0); }
+    }
+
+    /* Shimmer Effect for Loading/Skeletons */
+    @keyframes shimmer {
+        0% { background-position: -1000px 0; }
+        100% { background-position: 1000px 0; }
+    }
+
+    .animate-enter {
+        animation: fadeInUp var(--anim-slow) var(--ease-out-cubic) forwards;
+        opacity: 0; /* Starts hidden */
+    }
+
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+    .delay-5 { animation-delay: 0.5s; }
+
+    /* =========================================
+       4. LAYOUT COMPOSITION
+       ========================================= */
+    
+    .page-wrapper {
+        position: relative;
+        width: 100%;
+        isolation: isolate;
+    }
+
+    /* Parallax Background Container */
+    .immersive-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: var(--z-back);
+        overflow: hidden;
+    }
+
+    .immersive-bg img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scale(1.1); /* Initial scale for parallax room */
+        filter: brightness(0.4) saturate(1.2);
+        transition: transform 0.1s linear; /* Smooth JS hook */
+    }
+
+    /* Gradient Overlay for Readability */
+    .immersive-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+            to bottom,
+            rgba(5,5,5,0.3) 0%,
+            rgba(5,5,5,0.5) 40%,
+            var(--bg-body) 95%
+        );
+        z-index: 1;
+    }
+
+    /* Main Content Container */
+    .content-container {
+        position: relative;
+        z-index: var(--z-normal);
+        width: 100%;
+        max-width: 1800px; /* 4K Ready */
+        margin: 0 auto;
+        padding: 0 5%;
+        padding-top: 35vh; /* Push content down */
+        padding-bottom: 100px;
+    }
+
+    /* =========================================
+       5. HERO SECTION STYLES
+       ========================================= */
+    
+    .hero-grid {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 60px;
+        align-items: end;
+        margin-bottom: 80px;
+    }
+
+    /* Poster Card Design */
+    .poster-card {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 2/3;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        border: 1px solid rgba(255,255,255,0.1);
+        transition: transform var(--anim-med) var(--ease-out-cubic);
+    }
+
+    .poster-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        box-shadow: 0 30px 80px rgba(125, 42, 232, 0.3);
+    }
+
+    .poster-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Fallback placeholder style */
+    .poster-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        color: var(--text-secondary);
+    }
+
+    /* Hero Text Details */
+    .hero-details h1 {
+        font-size: clamp(2.5rem, 5vw, 4.5rem); /* Responsive Typography */
+        font-weight: 800;
+        margin-bottom: var(--space-md);
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+        background: linear-gradient(to right, #fff, #b3b3b3);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    /* Metadata Row */
+    .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-md);
+        align-items: center;
+        margin-bottom: var(--space-lg);
+        font-family: monospace; /* Tech feel */
+    }
+
+    .badge {
+        padding: 6px 14px;
+        border-radius: 4px;
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-primary);
+    }
+
+    .badge.rating {
+        background: rgba(255, 215, 0, 0.15);
+        color: #ffd700;
+        border-color: rgba(255, 215, 0, 0.3);
+    }
+
+    .description {
+        font-size: 1.125rem;
+        color: var(--text-secondary);
+        max-width: 800px;
+        margin-bottom: var(--space-xl);
+        line-height: 1.7;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+    }
+
+    /* Action Buttons */
+    .btn-group {
+        display: flex;
+        gap: var(--space-md);
+    }
+
+    .btn {
+        position: relative;
+        padding: 16px 36px;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        overflow: hidden;
+        transition: all var(--anim-fast);
+    }
+
+    .btn-primary {
+        background: var(--color-brand-primary);
+        color: #fff;
+        box-shadow: 0 10px 30px rgba(125, 42, 232, 0.4);
+    }
+
+    .btn-primary:hover {
+        background: #9b5ae0;
+        transform: translateY(-2px);
+        box-shadow: 0 15px 40px rgba(125, 42, 232, 0.6);
+    }
+
+    .btn-glass {
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #fff;
+    }
+
+    .btn-glass:hover {
+        background: rgba(255,255,255,0.2);
+        border-color: rgba(255,255,255,0.3);
+    }
+
+    /* =========================================
+       6. EPISODE LIST (GLASS CARDS)
+       ========================================= */
+    
+    .section-heading {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: var(--space-xl);
+        padding-left: var(--space-md);
+        border-left: 4px solid var(--color-brand-primary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .episodes-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: var(--space-lg);
+    }
+
+    .episode-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(var(--blur-strength));
+        -webkit-backdrop-filter: blur(var(--blur-strength));
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        padding: var(--space-md);
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        cursor: pointer;
+    }
+
+    /* Hover State for Cards */
+    .episode-card:hover {
+        background: rgba(40, 40, 40, 0.8);
+        border-color: var(--color-brand-primary);
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px -5px rgba(0,0,0,0.5);
+    }
+
+    /* Inner Elements */
+    .ep-thumbnail-box {
+        width: 120px;
+        height: 70px;
+        background: #000;
+        border-radius: 6px;
+        flex-shrink: 0;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .ep-thumbnail-box img {
+        width: 100%; height: 100%; object-fit: cover; opacity: 0.7; transition: 0.3s;
+    }
+
+    .episode-card:hover .ep-thumbnail-box img {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+
+    .ep-play-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.3);
+    }
+
+    .ep-play-icon {
+        width: 30px; height: 30px;
+        background: var(--color-brand-primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 12px;
+        box-shadow: 0 0 15px rgba(125, 42, 232, 0.8);
+        transform: scale(0.8);
+        transition: 0.3s;
+    }
+
+    .episode-card:hover .ep-play-icon {
+        transform: scale(1.1);
+        background: #fff;
+        color: var(--color-brand-primary);
+    }
+
+    .ep-info {
+        flex: 1;
+        min-width: 0; /* Prevents text overflow flex issues */
+    }
+
+    .ep-number {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--color-brand-primary);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    .ep-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .ep-duration {
+        font-size: 0.8rem;
+        color: var(--text-tertiary);
+        margin-top: 4px;
+        display: block;
+    }
+
+    /* Clickable Overlay Link */
+    .card-click-area {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+    }
+
+    /* =========================================
+       7. RESPONSIVE MEDIA QUERIES
+       ========================================= */
+    
+    /* Laptop / Small Desktop */
+    @media (max-width: 1280px) {
+        .content-container { padding-top: 30vh; }
+        .hero-details h1 { font-size: 3.5rem; }
+    }
+
+    /* Tablet */
+    @media (max-width: 1024px) {
+        .hero-grid {
+            grid-template-columns: 1fr;
+            justify-items: center;
+            text-align: center;
+            gap: 40px;
+        }
+
+        .poster-card {
+            width: 240px;
+            margin: 0 auto;
+        }
+
+        .hero-details {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .meta-row { justify-content: center; }
+        .description { text-align: center; }
+        .section-heading { justify-content: center; border: none; padding: 0; }
+    }
+
+    /* Mobile */
+    @media (max-width: 600px) {
+        .hero-details h1 { font-size: 2.2rem; }
+        .episodes-grid { grid-template-columns: 1fr; }
+        .btn-group { flex-direction: column; width: 100%; }
+        .btn { width: 100%; justify-content: center; }
+        .episode-card { padding: 12px; }
+        .ep-thumbnail-box { width: 90px; height: 55px; }
+    }
+
+</style>
+
+<div class="page-wrapper">
+
+    <div class="immersive-bg" id="parallaxLayer">
+        {% if season.banner and season.banner.url %}
+            <img src="{{ season.banner.url }}" alt="Background" onerror="this.style.display='none'">
+        {% elif season.thumbnail and season.thumbnail.url %}
+            <img src="{{ season.thumbnail.url }}" alt="Background" onerror="this.style.display='none'">
+        {% else %}
+            <img src="https://wallpapers.com/images/hd/aesthetic-anime-scenery-1920x1080-0a8a6.jpg" alt="Default Background">
+        {% endif %}
+        
+        <div class="immersive-overlay"></div>
+    </div>
+
+    <main class="content-container">
+
+        <section class="hero-grid">
+            
+            <div class="poster-col animate-enter delay-1">
+                <div class="poster-card">
+                    {% if season.thumbnail and season.thumbnail.url %}
+                        <img src="{{ season.thumbnail.url }}" 
+                             alt="{{ season.name }}" 
+                             onerror="this.onerror=null;this.src='https://via.placeholder.com/600x900/1a1a1a/ffffff?text={{ season.name|urlencode }}';">
+                    {% else %}
+                        <div class="poster-placeholder">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                            <span style="margin-top:10px; font-weight:600;">{{ season.name }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="hero-details">
+                
+                <h1 class="animate-enter delay-2">{{ season.name }}</h1>
+
+                <div class="meta-row animate-enter delay-3">
+                    <span class="badge">TV Series</span>
+                    <span class="badge rating">★ {{ season.rating|default:"N/A" }}</span>
+                    <span class="badge">{{ season.total_episodes|default:"?" }} EPISODES</span>
+                    <span class="badge">{{ season.release_date|date:"Y"|default:"Unknown" }}</span>
+                    {% if season.genre %}
+                        <span class="badge" style="background:transparent; border-color:var(--text-secondary); color:var(--text-secondary);">{{ season.genre }}</span>
+                    {% endif %}
+                </div>
+
+                <p class="description animate-enter delay-4">
+                    {{ season.description|default:"Plot summary is currently unavailable for this title. Please check back later for updates." }}
+                </p>
+
+                <div class="btn-group animate-enter delay-5">
+                    {% if last_episode %}
+                    <a href="{% url 'video_player' last_episode.id %}" class="btn btn-primary">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        Watch Episode {{ last_episode.episode_number }}
+                    </a>
+                    {% endif %}
+                    
+                    <button class="btn btn-glass">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        Add to List
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="episodes-section animate-enter delay-5" style="margin-top: 60px;">
+            
+            <div class="section-heading">
+                <span>Episodes</span>
+                <span style="font-size:1rem; font-weight:400; color:var(--text-tertiary);">{{ episodes.count }} Items</span>
+            </div>
+
+            <div class="episodes-grid">
+                {% for episode in episodes %}
+                <div class="episode-card" title="{{ episode.title }}">
+                    
+                    <div class="ep-thumbnail-box">
+                        {% if episode.thumbnail %}
+                            <img src="{{ episode.thumbnail.url }}" onerror="this.src='https://via.placeholder.com/300x180/000/fff?text=EP{{ episode.episode_number }}'">
+                        {% elif season.thumbnail %}
+                            <img src="{{ season.thumbnail.url }}">
+                        {% else %}
+                             <img src="https://via.placeholder.com/300x180/000/fff?text=AnimeFlix">
+                        {% endif %}
+                        
+                        <div class="ep-play-overlay">
+                            <div class="ep-play-icon">▶</div>
+                        </div>
+                    </div>
+
+                    <div class="ep-info">
+                        <span class="ep-number">Episode {{ episode.episode_number }}</span>
+                        <h3 class="ep-title">{{ episode.title|default:"Untitled Episode" }}</h3>
+                        <span class="ep-duration">24 min</span>
+                    </div>
+
+                    <a href="{% url 'video_player' episode.id %}" class="card-click-area"></a>
+                </div>
+                {% empty %}
+                <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-tertiary);">
+                    <h3>No episodes uploaded yet.</h3>
+                </div>
+                {% endfor %}
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // 1. Parallax Scroll Effect
+    const bgLayer = document.querySelector('.immersive-bg img');
+    const heroSection = document.querySelector('.hero-grid');
+    
+    window.addEventListener('scroll', () => {
+        const scrollY = window.pageYOffset;
+        
+        // Only run if within visible range to save performance
+        if (scrollY < window.innerHeight) {
+            // Move background slower (0.4 speed)
+            const translateVal = scrollY * 0.4;
+            // Increase scale slightly as you scroll down for dramatic effect
+            const scaleVal = 1.1 + (scrollY * 0.0005); 
+            
+            bgLayer.style.transform = `translate3d(0, ${translateVal}px, 0) scale(${scaleVal})`;
+            
+            // Fade out hero content slightly
+            heroSection.style.opacity = 1 - (scrollY / 700);
+        }
+    });
+
+    // 2. Intersection Observer for Episode Cards (Staggered Load)
+    const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+
+    // Apply animation styles initially via JS to keep CSS clean
+    const epCards = document.querySelectorAll('.episode-card');
+    epCards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        
+        // Add staggered delay
+        // (index % 10) ensures we don't get huge delays on long lists
+        const delay = (index % 10) * 50; 
+        setTimeout(() => {
+            observer.observe(card);
+        }, delay);
+    });
+
+    // 3. Image Error Handling (Fallback for JS loaded images)
+    // This is a backup for the HTML onerror attribute
+    document.querySelectorAll('img').forEach(img => {
+        img.addEventListener('error', function() {
+            // If already replaced, stop to prevent loop
+            if (this.src.includes('placeholder.com')) return; 
+            
+            // Check if it's a poster or a wide banner
+            if (this.closest('.poster-card')) {
+                this.src = 'https://via.placeholder.com/600x900/111/444?text=No+Cover';
+            } else {
+                this.src = 'https://via.placeholder.com/1920x1080/000/333?text=Image+Not+Found';
+            }
+        });
+    });
+
+});
+</script>
+
+{% endblock %}

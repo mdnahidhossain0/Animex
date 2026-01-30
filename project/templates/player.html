@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+{{ season.name }} – {{ episode.title }}
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.21.5/video-js.min.css" rel="stylesheet">
+<link href="https://unpkg.com/@videojs/themes@1/dist/city/index.css" rel="stylesheet">
+
+<style>
+    /* --- 1. CORE VARIABLES & THEME --- */
+    :root {
+        --primary: #ff0055;       /* Neon Red */
+        --accent: #00f0ff;        /* Neon Cyan */
+        --bg-dark: #050505;
+        --glass-bg: rgba(20, 20, 20, 0.6);
+        --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    body {
+        background-color: var(--bg-dark);
+        overflow-x: hidden; /* Prevent particle overflow */
+    }
+
+    /* --- 2. BACKGROUND ANIMATIONS --- */
+    .bg-particles {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: -1;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    .particle {
+        position: absolute;
+        bottom: -10px;
+        background: rgba(255, 0, 85, 0.2);
+        border-radius: 50%;
+        animation: floatUp 15s infinite linear;
+    }
+
+    /* Randomize particle sizes/speeds via nth-child in loop below */
+    @keyframes floatUp {
+        0% { transform: translateY(0) scale(1); opacity: 0; }
+        20% { opacity: 0.5; }
+        100% { transform: translateY(-100vh) scale(1.5); opacity: 0; }
+    }
+
+    /* --- 3. PAGE TRANSITIONS --- */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(40px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .player-page {
+        animation: fadeInUp 0.8s var(--ease-elastic) forwards;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        color: #fff;
+        position: relative;
+        z-index: 1;
+    }
+
+    /* --- 4. HEADER GLOW --- */
+    .top-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .neon-title {
+        font-size: 1.8rem;
+        margin: 0;
+        font-weight: 800;
+        text-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
+        transition: 0.3s;
+    }
+    
+    .neon-title:hover {
+        color: var(--accent);
+        text-shadow: 0 0 15px var(--accent);
+    }
+
+    .back-btn {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #ccc;
+        padding: 8px 16px;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .back-btn:hover {
+        background: var(--primary);
+        color: white;
+        box-shadow: 0 0 15px var(--primary);
+        border-color: var(--primary);
+        transform: translateX(-5px);
+    }
+
+    /* --- 5. CINEMA CONTAINER (The Stage) --- */
+    .cinema-container {
+        position: relative;
+        background: #000;
+        border-radius: 16px;
+        overflow: hidden;
+        /* Default subtle glow */
+        box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        border: 1px solid rgba(255,255,255,0.1);
+        transition: all 0.5s ease;
+    }
+
+    /* Pulse animation when hovering or active */
+    .cinema-container:hover {
+        border-color: rgba(255, 0, 85, 0.4);
+        box-shadow: 0 0 30px rgba(255, 0, 85, 0.15), 0 20px 50px rgba(0,0,0,0.9);
+    }
+
+    /* Scanline Effect Overlay (Retro TV Vibe) */
+    .cinema-container::after {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0; left: 0; bottom: 0; right: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+        z-index: 2;
+        background-size: 100% 2px, 3px 100%;
+        pointer-events: none; /* Let clicks pass through */
+        opacity: 0.3;
+    }
+
+    .aspect-ratio-box {
+        position: relative;
+        width: 100%;
+        padding-top: 56.25%; /* 16:9 */
+        background: #000;
+    }
+
+    .video-js, iframe.universal-embed {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        border: none;
+        z-index: 1; /* Below scanlines */
+    }
+
+    /* --- 6. ANIMATED LOADER --- */
+    .status-msg {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: #000;
+        z-index: 5;
+    }
+
+    .neon-loader {
+        width: 50px;
+        height: 50px;
+        border: 4px solid rgba(255,255,255,0.1);
+        border-top: 4px solid var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 15px;
+        box-shadow: 0 0 15px var(--primary);
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* --- 7. CONTROLS UI --- */
+    .controls-bar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        padding: 20px;
+        background: rgba(10, 10, 10, 0.8);
+        backdrop-filter: blur(10px);
+        border-radius: 0 0 16px 16px;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        transform: translateY(-5px); /* Tuck under video */
+    }
+
+    .ctrl-btn {
+        background: rgba(255,255,255,0.05);
+        color: #ddd;
+        border: 1px solid rgba(255,255,255,0.1);
+        padding: 12px 24px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        font-family: 'Courier New', monospace; /* Tech feel */
+        transition: all 0.2s var(--ease-elastic);
+        display: flex; align-items: center; gap: 10px;
+    }
+
+    .ctrl-btn:hover {
+        background: white;
+        color: black;
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 5px 20px rgba(255,255,255,0.3);
+    }
+
+    .ctrl-btn:active { transform: scale(0.95); }
+
+    /* Next Button Special Effect */
+    .next-btn {
+        background: linear-gradient(135deg, var(--primary), #ff5500);
+        border: none;
+        color: white;
+        padding: 12px 30px;
+        font-size: 1.1rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Shine effect passing through button */
+    .next-btn::after {
+        content: '';
+        position: absolute;
+        top: 0; left: -100%; width: 100%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        transition: 0.5s;
+    }
+    
+    .next-btn:hover::after { left: 100%; }
+    
+    .next-btn:hover {
+        box-shadow: 0 0 25px var(--primary);
+        transform: translateY(-3px);
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="bg-particles">
+    {% comment %} Generating random particles {% endcomment %}
+    <div class="particle" style="left: 10%; width: 4px; height: 4px; animation-duration: 12s;"></div>
+    <div class="particle" style="left: 30%; width: 6px; height: 6px; animation-duration: 18s; animation-delay: 2s;"></div>
+    <div class="particle" style="left: 70%; width: 3px; height: 3px; animation-duration: 10s; animation-delay: 5s;"></div>
+    <div class="particle" style="left: 90%; width: 5px; height: 5px; animation-duration: 15s; animation-delay: 1s;"></div>
+    <div class="particle" style="left: 50%; width: 4px; height: 4px; animation-duration: 20s; animation-delay: 7s;"></div>
+</div>
+
+<div class="player-page">
+
+    <header class="top-header">
+        <div>
+            <h1 class="neon-title">{{ season.name }}</h1>
+            <span style="color:#888; letter-spacing: 1px; font-size: 0.9rem;">
+                EPISODE {{ episode.episode_number }} <span style="color:var(--primary);">//</span> {{ episode.title }}
+            </span>
+        </div>
+        <button class="back-btn" onclick="window.history.back()">
+            ← Back to Season
+        </button>
+    </header>
+
+    <div class="cinema-container">
+        <div class="aspect-ratio-box" id="player-mount">
+            <div class="status-msg">
+                <div class="neon-loader"></div>
+                <p style="color:#888; font-family: monospace; animation: pulseText 1.5s infinite;">INITIALIZING STREAM...</p>
+                <style>@keyframes pulseText { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }</style>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-bar" id="external-controls">
+        <button class="ctrl-btn" onclick="safeSkip(-10)">
+            ⏪ -10s
+        </button>
+        <button class="ctrl-btn" onclick="safeToggle()" style="min-width: 140px; justify-content: center;">
+            <span id="play-icon">▶</span> Play
+        </button>
+        <button class="ctrl-btn" onclick="safeSkip(10)">
+            +10s ⏩
+        </button>
+    </div>
+
+    <div style="margin-top: 40px; display: flex; justify-content: flex-end;">
+        {% if next_episode %}
+        <button class="ctrl-btn next-btn" onclick="window.location.href='{% url 'video_player' next_episode.id %}'">
+            Next Episode ➜
+        </button>
+        {% else %}
+        <div style="padding: 15px 25px; border: 1px solid #333; border-radius: 12px; background: rgba(255,255,255,0.05);">
+            <p style="margin:0; color: #888;">🎉 Season Finale Reached</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/video.js/7.21.5/video.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-youtube/2.6.1/Youtube.min.js" defer></script>
+
+<input type="hidden" id="data-url" value="{{ episode.video_url }}">
+<input type="hidden" id="data-poster" value="{% if episode.thumbnail %}{{ episode.thumbnail.url }}{% endif %}">
+<input type="hidden" id="data-id" value="{{ episode.id }}">
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    const mountPoint = document.getElementById('player-mount');
+    const controlsPanel = document.getElementById('external-controls');
+    const playIcon = document.getElementById('play-icon');
+    let vjsPlayer = null;
+
+    function init() {
+        try {
+            const rawUrl = document.getElementById('data-url').value;
+            const poster = document.getElementById('data-poster').value;
+            const vidId = document.getElementById('data-id').value;
+
+            if (!rawUrl || rawUrl.trim() === "") throw new Error("No video URL found.");
+
+            let type = detectSource(rawUrl);
+            mountPoint.innerHTML = ''; // Remove loader
+
+            if (type === 'facebook' || type === 'vimeo' || type === 'dailymotion') {
+                mountIframe(type, rawUrl);
+            } else {
+                mountVideoJS(type, rawUrl, poster, vidId);
+            }
+
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    function detectSource(url) {
+        if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+        if (url.includes('facebook.com') || url.includes('fb.watch')) return 'facebook';
+        if (url.includes('vimeo.com')) return 'vimeo';
+        if (url.includes('dailymotion.com')) return 'dailymotion';
+        return 'html5';
+    }
+
+    function mountIframe(type, url) {
+        if(controlsPanel) controlsPanel.style.display = 'none'; // Hide custom controls for iframes
+        let embedSrc = '';
+        if (type === 'facebook') embedSrc = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&autoplay=1`;
+        else if (type === 'vimeo') embedSrc = `https://player.vimeo.com/video/${url.split('/').pop()}`;
+        else if (type === 'dailymotion') embedSrc = url.replace('/video/', '/embed/video/');
+
+        mountPoint.innerHTML = `<iframe class="universal-embed" src="${embedSrc}" allowfullscreen allow="autoplay; encrypted-media"></iframe>`;
+    }
+
+    function mountVideoJS(type, url, poster, id) {
+        if(controlsPanel) controlsPanel.style.display = 'flex';
+        
+        // Dynamic Player Button Update Logic
+        const updatePlayButton = (isPaused) => {
+            playIcon.innerHTML = isPaused ? '▶' : '⏸';
+            playIcon.parentElement.innerHTML = isPaused ? '<span id="play-icon">▶</span> Play' : '<span id="play-icon">⏸</span> Pause';
+        };
+
+        const vid = document.createElement('video');
+        vid.id = 'main-player';
+        vid.className = 'video-js vjs-big-play-centered vjs-theme-city';
+        vid.controls = true;
+        vid.setAttribute('playsinline', '');
+        if (poster) vid.poster = poster;
+        
+        mountPoint.appendChild(vid);
+
+        vjsPlayer = videojs('main-player', {
+            techOrder: ["youtube", "html5"],
+            sources: [{ type: (type === 'youtube' ? 'video/youtube' : 'video/mp4'), src: url }],
+            youtube: { iv_load_policy: 3, modestbranding: 1, rel: 0 }
+        });
+
+        const saveKey = `vid_progress_${id}`;
+        
+        vjsPlayer.ready(() => {
+            const savedTime = localStorage.getItem(saveKey);
+            if (savedTime) setTimeout(() => vjsPlayer.currentTime(parseFloat(savedTime)), 500);
+            
+            // Sync custom button with player state
+            vjsPlayer.on('play', () => updatePlayButton(false));
+            vjsPlayer.on('pause', () => updatePlayButton(true));
+        });
+
+        vjsPlayer.on('timeupdate', () => localStorage.setItem(saveKey, vjsPlayer.currentTime()));
+    }
+
+    function showError(msg) {
+        mountPoint.innerHTML = `
+            <div class="status-msg" style="color:#ff5555; background: #111;">
+                <span style="font-size:3rem;">⚠️</span>
+                <p><strong>Error:</strong> ${msg}</p>
+            </div>`;
+    }
+
+    window.safeSkip = (val) => {
+        if (vjsPlayer) {
+            vjsPlayer.currentTime(vjsPlayer.currentTime() + val);
+            // Visual feedback could be added here
+        }
+    };
+
+    window.safeToggle = () => {
+        if (vjsPlayer) vjsPlayer.paused() ? vjsPlayer.play() : vjsPlayer.pause();
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (!vjsPlayer || ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+        if (e.code === 'Space') { e.preventDefault(); safeToggle(); }
+        if (e.code === 'ArrowRight') safeSkip(5);
+        if (e.code === 'ArrowLeft') safeSkip(-5);
+        if (e.code === 'KeyF') vjsPlayer.requestFullscreen();
+    });
+
+    init();
+});
+</script>
+{% endblock %}
