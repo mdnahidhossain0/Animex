@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: animex
+    env: python
+    buildCommand: |
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+      export PATH="$HOME/.cargo/bin:$PATH"
+      uv sync
+      python manage.py collectstatic --noinput
+      python manage.py migrate
+    startCommand: |
+      export PATH="$HOME/.cargo/bin:$PATH"
+      uv run gunicorn project.wsgi:application
